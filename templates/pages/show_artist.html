@@ -6,7 +6,7 @@
 		<h1 class="monospace">
 			{{ artist.name }}
 		</h1>
-		<p class="subtitle">
+		<p class="subtitle" id="subtitle">
 			ID: {{ artist.id }}
 		</p>
 		<div class="genres">
@@ -73,6 +73,28 @@
 </section>
 
 <a href="/artists/{{ artist.id }}/edit"><button class="btn btn-primary btn-lg">Edit</button></a>
+<button id='delete_artist' class="btn btn-primary btn-lg">Delete</button>
+<script>
+	const delete_artist = document.getElementById('delete_artist')
+	const delete_id = document.getElementById('subtitle').innerHTML
+	const id = delete_id.substr(8, 4)
+
+	delete_artist.onclick = (e) => {
+      fetch('/artists/' + id, {
+        method: 'DELETE',
+      
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    }).then(() => {
+		window.location = '/'
+    })
+    .catch(e => {
+    console.log(e)
+})
+	}
+
+</script>
 
 {% endblock %}
 
