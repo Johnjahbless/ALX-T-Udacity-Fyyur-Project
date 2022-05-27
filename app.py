@@ -4,7 +4,9 @@
 
 from distutils.log import error
 import json
+from sqlalchemy import or_, desc
 from os import abort
+from site import venv
 from time import time
 import dateutil.parser
 import babel
@@ -115,7 +117,11 @@ app.jinja_env.filters['datetime'] = format_datetime
 
 @app.route('/')
 def index():
-  return render_template('pages/home.html')
+  venues = Venue.query.order_by(desc('id')).limit(5).all()
+  artists = Artist.query.order_by(desc('id')).limit(5).all()
+
+
+  return render_template('pages/home.html', venues=venues, artists=artists)
 
 
 #  Venues
@@ -129,7 +135,7 @@ def venues():
   areas = Venue.query.order_by('id').all()
 
   #declare an empty list to hold venues data
-  my_arr = []
+  venues = []
 
   for v in areas:
     #declare an empty dictionary to hold each venue data and their values
@@ -143,24 +149,27 @@ def venues():
     my_arr2.append({
       'id': v.id,
       "name": v.name,
-      'num_upcoming_shows': 2
+      'num_upcoming_shows': v.num_upcoming_shows
     })
     my_dic['venues'] = my_arr2
     
-    my_arr.append(my_dic)
+    venues.append(my_dic)
   
  
-  return render_template('pages/venues.html', areas=my_arr);
+  return render_template('pages/venues.html', areas=venues);
 
 @app.route('/venues/search', methods=['POST'])
 def search_venues():
   # TODO: implement search on artists with partial string search. Ensure it is case-insensitive.
   # seach for Hop should return "The Musical Hop".
   # search for "Music" should return "The Musical Hop" and "Park Square Live Music & Coffee"
+  
   search_text = request.form.get('search_term')
 
-  # get all data from the table based on the search text using the LIKE keyword
-  response = db.session.query(Venue).filter(Venue.name.ilike(f'%{search_text}%')).all()
+  # get all data from the table based on the search text using the 
+  # LIKE keyword for either the name
+  # of the venue, city or state  
+  response = db.session.query(Venue).filter(or_ (Venue.name.ilike(f'%{search_text}%'), Venue.city.ilike(f'%{search_text}%'), Venue.state.ilike(f'%{search_text}%'))).all()
 
   # A dictionary that will hold all the data returned from the DB
   my_dic = {}
@@ -208,7 +217,7 @@ def show_venue(venue_id):
     "image_link": data.image_link
   }
 
-  # Today's datetime in seconds
+  # Current datetime in seconds
   t = time.time()
 
   # A list to hold all past shows
@@ -221,11 +230,15 @@ def show_venue(venue_id):
     my_dic = {}
     if s.start_time.timestamp() < t :
       my_dic['artist_id'] = s.artist_id
+      my_dic['artist_name'] = Artist.query.filter(Artist.id == s.artist_id).first().name
+      my_dic['artist_image_link'] = Artist.query.filter(Artist.id == s.artist_id).first().image_link
       my_dic['start_time'] = s.start_time
       my_list.append(my_dic)
 
     else:
       my_dic['artist_id'] = s.artist_id
+      my_dic['artist_name'] = Artist.query.filter(Artist.id == s.artist_id).first().name
+      my_dic['artist_image_link'] = Artist.query.filter(Artist.id == s.artist_id).first().image_link
       my_dic['start_time'] = s.start_time
       my_list2.append(my_dic)
 
@@ -268,9 +281,19 @@ def create_venue_submission():
     seeking_talent = seeking_talent
     seeking_description = request.form['seeking_description']
 
-    venue = Venue(name=name, city=city, state=state, address=address, phone=phone, genres=genres,
-    facebook_link=facebook_link, image_link=image_link, website_link=website_link, seeking_talent=seeking_talent,
-    seeking_description=seeking_description)
+    venue = Venue(
+      name = name, 
+      city = city, 
+      state = state, 
+      address = address, 
+      phone = phone, 
+      genres = genres,
+      facebook_link = facebook_link, 
+      image_link = image_link, 
+      website_link = website_link, 
+      seeking_talent = seeking_talent,
+      seeking_description = seeking_description
+    )
 
     db.session.add(venue)
     db.session.commit()
@@ -294,7 +317,7 @@ def create_venue_submission():
   # TODO: on unsuccessful db insert, flash an error instead.
   # e.g., flash('An error occurred. Venue ' + data.name + ' could not be listed.')
   # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
-  return render_template('pages/home.html')
+  return redirect(url_for('index'))
 
 @app.route('/venues/<venue_id>', methods=['DELETE'])
 def delete_venue(venue_id):
@@ -325,7 +348,7 @@ def delete_venue(venue_id):
   else:
     flash('Venue was successfully deleted!')
 
-  return render_template('pages/home.html')
+  return redirect(url_for('index'))
 #  Artists
 #  ----------------------------------------------------------------
 @app.route('/artists')
@@ -342,20 +365,22 @@ def search_artists():
   # search for "band" should return "The Wild Sax Band".
   search_text = request.form.get('search_term')
 
-  # get all data from the table based on the search text using the LIKE keyword
-  response = db.session.query(Artist).filter(Artist.name.ilike(f'%{search_text}%')).all()
+  # get all data from the table based on the search text using the 
+  # LIKE keyword for either the name
+  # of the artist, city or state
+  artists = db.session.query(Artist).filter(or_ (Artist.name.ilike(f'%{search_text}%'), Artist.city.ilike(f'%{search_text}%'), Artist.state.ilike(f'%{search_text}%'))).all()
 
   # A dictionary that will hold all the data returned from the DB
   my_dic = {}
 
-  # A list that will hold each venue data and thier values
+  # A list that will hold each artist data and thier values
   my_list = []
 
   # An int of the count increases based on the total num of results returned from the DB
   i = 0
 
   # A loop to loop through each returned data
-  for a in response:
+  for a in artists:
     # A dictionary that holds each venue and thier values
     my_dic2 = {}
     i = i + 1
@@ -401,47 +426,21 @@ def show_artist(artist_id):
     my_dic = {}
     if s.start_time.timestamp() < t :
       my_dic['venue_id'] = s.venue_id
+      my_dic['venue_name'] = Venue.query.filter(Venue.id == s.venue_id).first().name
+      my_dic['venue_image_link'] = Venue.query.filter(Venue.id == s.venue_id).first().image_link
       my_dic['start_time'] = s.start_time
       my_list.append(my_dic)
 
     else:
       my_dic['venue_id'] = s.venue_id
+      my_dic['venue_name'] = Venue.query.filter(Venue.id == s.venue_id).first().name
+      my_dic['venue_image_link'] = Venue.query.filter(Venue.id == s.venue_id).first().image_link
       my_dic['start_time'] = s.start_time
       my_list2.append(my_dic)
 
   artist['past_shows']= my_list
   artist['upcoming_shows'] = my_list2
 
-  # data3={
-  #   "id": 6,
-  #   "name": "The Wild Sax Band",
-  #   "genres": ["Jazz", "Classical"],
-  #   "city": "San Francisco",
-  #   "state": "CA",
-  #   "phone": "432-325-5432",
-  #   "seeking_venue": False,
-  #   "image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-  #   "past_shows": [],
-  #   "upcoming_shows": [{
-  #     "venue_id": 3,
-  #     "venue_name": "Park Square Live Music & Coffee",
-  #     "venue_image_link": "https://images.unsplash.com/photo-1485686531765-ba63b07845a7?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=747&q=80",
-  #     "start_time": "2035-04-01T20:00:00.000Z"
-  #   }, {
-  #     "venue_id": 3,
-  #     "venue_name": "Park Square Live Music & Coffee",
-  #     "venue_image_link": "https://images.unsplash.com/photo-1485686531765-ba63b07845a7?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=747&q=80",
-  #     "start_time": "2035-04-08T20:00:00.000Z"
-  #   }, {
-  #     "venue_id": 3,
-  #     "venue_name": "Park Square Live Music & Coffee",
-  #     "venue_image_link": "https://images.unsplash.com/photo-1485686531765-ba63b07845a7?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=747&q=80",
-  #     "start_time": "2035-04-15T20:00:00.000Z"
-  #   }],
-  #   "past_shows_count": 0,
-  #   "upcoming_shows_count": 3,
-  # }
-  # data = list(filter(lambda d: d['id'] == artist_id, [data1, data2, data3]))[0]
   return render_template('pages/show_artist.html', artist=artist)
 
 #  Update
@@ -460,16 +459,17 @@ def edit_artist_submission(artist_id):
 
   error = False
 
-  # Check if a values are available in the list to avoid server error
+  # Check if some values are available in the list to avoid server error
   if 'seeking_venue' in request.form:
     seeking_venue = request.form['seeking_venue']
   else:
     seeking_venue = ''
 
-    if 'available' in request.form:
-      available = request.form['available']
-    else:
-      available = ''
+  if 'available' in request.form:
+    available = request.form['available']
+  else:
+    available = ''
+
   try:
     artist = Artist.query.get(artist_id)
 
@@ -544,7 +544,7 @@ def delete_artist(artist_id):
   else:
     flash('Artist was successfully deleted!')
 
-  return render_template('pages/home.html')
+  return redirect(url_for('index'))
 
 @app.route('/venues/<int:venue_id>/edit', methods=['GET'])
 def edit_venue(venue_id):
@@ -561,7 +561,7 @@ def edit_venue_submission(venue_id):
   # venue record with ID <venue_id> using the new attributes
   error = False
 
-    # Check if a values are available in the list to avoid server error
+    # Check if value is available in the list to avoid server error
   if 'seeking_talent' in request.form:
     seeking_talent = request.form['seeking_venue']
   else:
@@ -581,17 +581,17 @@ def edit_venue_submission(venue_id):
     seeking_talent = seeking_talent
     seeking_description = request.form['seeking_description']
 
-    venue.name=name
-    venue.city=city
-    venue.state=state
-    venue.address=address
-    venue.phone=phone
-    venue.genres=genres
-    venue.facebook_link=facebook_link
-    venue.image_link=image_link
-    venue.website_link=website_link
-    venue.seeking_talent=seeking_talent
-    venue.seeking_description=seeking_description
+    venue.name = name
+    venue.city = city
+    venue.state = state
+    venue.address = address
+    venue.phone = phone
+    venue.genres = genres
+    venue.facebook_link = facebook_link
+    venue.image_link = image_link
+    venue.website_link = website_link
+    venue.seeking_talent = seeking_talent
+    venue.seeking_description = seeking_description
 
     db.session.commit()
   
@@ -627,16 +627,16 @@ def create_artist_submission():
   # TODO: modify data to be the data object returned from db insertion
   error = False
 
-  # Check if a values are available in the list to avoid server error
+  # Check if some values are available in the list to avoid server error
   if 'seeking_venue' in request.form:
     seeking_venue = request.form['seeking_venue']
   else:
     seeking_venue = ''
 
-    if 'available' in request.form:
-      available = request.form['available']
-    else:
-      available = ''
+  if 'available' in request.form:
+    available = request.form['available']
+  else:
+    available = ''
 
   try:
     name = request.form['name']
@@ -673,7 +673,7 @@ def create_artist_submission():
     flash('Artist ' + request.form['name'] + ' was successfully listed!')
   # TODO: on unsuccessful db insert, flash an error instead.
   # e.g., flash('An error occurred. Artist ' + data.name + ' could not be listed.')
-  return render_template('pages/home.html')
+  return redirect(url_for('index'))
 
 
 #  Shows
