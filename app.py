@@ -3,12 +3,9 @@
 #----------------------------------------------------------------------------#
 
 from distutils.log import error
-from email.policy import default
 import json
 from os import abort
 from time import time
-from unicodedata import name
-from urllib import response
 import dateutil.parser
 import babel
 from flask import Flask, render_template, request, Response, flash, redirect, url_for
@@ -19,7 +16,6 @@ from logging import Formatter, FileHandler
 from flask_wtf import Form
 from forms import * 
 from flask_migrate import Migrate
-import sys
 import datetime
 import time
 
@@ -82,6 +78,7 @@ class Artist(db.Model):
     seeking_description = db.Column(db.String(), nullable=True)
     genres = db.Column(db.String(), nullable=True)
     created_date = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
+    available = db.Column(db.String(), nullable=True)
     shows = db.relationship('Show', backref='Artist', lazy=True);
 
 
@@ -130,13 +127,17 @@ def venues():
   #       num_upcoming_shows should be aggregated based on number of upcoming shows per venue.
 
   areas = Venue.query.order_by('id').all()
-  #shows = Show.query.order_by('id').all()
 
+  #declare an empty list to hold venues data
   my_arr = []
 
   for v in areas:
+    #declare an empty dictionary to hold each venue data and their values
     my_dic = {}
+
+    #declare an empty list to hold upcoming shows for each venue
     my_arr2 = []
+
     my_dic['city'] = v.city
     my_dic['state'] = v.state
     my_arr2.append({
@@ -158,22 +159,30 @@ def search_venues():
   # search for "Music" should return "The Musical Hop" and "Park Square Live Music & Coffee"
   search_text = request.form.get('search_term')
 
-  #get data from the tabel
+  # get all data from the table based on the search text using the LIKE keyword
   response = db.session.query(Venue).filter(Venue.name.ilike(f'%{search_text}%')).all()
 
+  # A dictionary that will hold all the data returned from the DB
   my_dic = {}
-  my_arr = []
+
+  # A list that will hold each venue data and thier values
+  my_list = []
+
+  # An int of the count increases based on the total num of results returned from the DB
   i = 0
+
+  # A loop to loop through each returned data
   for a in response:
+    # A dictionary that holds each venue and thier values
     my_dic2 = {}
     i = i + 1
     my_dic['count'] = i 
     my_dic2['id'] = a.id
     my_dic2['name'] = a.name
     my_dic2['num_upcoming_shows'] = a.num_upcoming_shows
-    my_arr.append(my_dic2)
+    my_list.append(my_dic2)
     
-  my_dic['data'] = my_arr
+  my_dic['data'] = my_list
 
   return render_template('pages/search_venues.html', results=my_dic, search_term=request.form.get('search_term', ''))
 
@@ -182,9 +191,9 @@ def show_venue(venue_id):
   # shows the venue page with the given venue_id
   # TODO: replace with real venue data from the venues table, using venue_id
   data = Venue.query.filter(Venue.id == venue_id).first()
-  past_shows = Show.query.filter(Show.venue_id == venue_id).all()
-  #print(past_shows)
-  mydata = {
+  shows = Show.query.filter(Show.venue_id == venue_id).all()
+
+  venue = {
     "id": data.id,
     "name": data.name,
     "genres": data.genres.split(','),
@@ -198,25 +207,32 @@ def show_venue(venue_id):
     "seeking_description": data.seeking_description,
     "image_link": data.image_link
   }
+
+  # Today's datetime in seconds
   t = time.time()
-  my_arr = []
-  my_arr2 = []
-  for s in past_shows:
+
+  # A list to hold all past shows
+  my_list = []
+
+  # A list to hold all upcoming shows
+  my_list2 = []
+
+  for s in shows:
     my_dic = {}
     if s.start_time.timestamp() < t :
       my_dic['artist_id'] = s.artist_id
       my_dic['start_time'] = s.start_time
-      my_arr.append(my_dic)
+      my_list.append(my_dic)
 
     else:
       my_dic['artist_id'] = s.artist_id
       my_dic['start_time'] = s.start_time
-      my_arr2.append(my_dic)
+      my_list2.append(my_dic)
 
-  mydata['past_shows']= my_arr
-  mydata['upcoming_shows'] = my_arr2
+  venue['past_shows']= my_list
+  venue['upcoming_shows'] = my_list2
   
-  return render_template('pages/show_venue.html', venue=mydata)
+  return render_template('pages/show_venue.html', venue=venue)
 
 #  Create Venue
 #  ----------------------------------------------------------------
@@ -230,8 +246,15 @@ def create_venue_form():
 def create_venue_submission():
   # TODO: insert form data as a new Venue record in the db, instead
   # TODO: modify data to be the data object returned from db insertion
-  #print(request.form.getlist('genres'))
+  
   error = False
+
+  # Check if a values are available in the list to avoid server error
+  if 'seeking_talent' in request.form:
+    seeking_talent = request.form['seeking_venue']
+  else:
+    seeking_talent = ''
+
   try:
     name = request.form['name']
     city = request.form['city']
@@ -242,11 +265,13 @@ def create_venue_submission():
     facebook_link = request.form['facebook_link']
     image_link = request.form['image_link']
     website_link = request.form['website_link']
-    seeking_talent = request.form['seeking_talent']
+    seeking_talent = seeking_talent
     seeking_description = request.form['seeking_description']
+
     venue = Venue(name=name, city=city, state=state, address=address, phone=phone, genres=genres,
     facebook_link=facebook_link, image_link=image_link, website_link=website_link, seeking_talent=seeking_talent,
     seeking_description=seeking_description)
+
     db.session.add(venue)
     db.session.commit()
   
@@ -254,7 +279,6 @@ def create_venue_submission():
     print(e)
     error = True
     db.session.rollback()
-    #print(sys.exc_info)
 
   finally:
     db.session.close()
@@ -283,11 +307,14 @@ def delete_venue(venue_id):
   try:
     Show.query.filter(Show.venue_id==venue_id).delete()
     Venue.query.filter_by(id=venue_id).delete()
+
     db.session.commit()
+
   except Exception as e:
     error = True
     print(e)
     db.session.rollback()
+
   finally:
     db.session.close()
 
@@ -315,22 +342,30 @@ def search_artists():
   # search for "band" should return "The Wild Sax Band".
   search_text = request.form.get('search_term')
 
-  #get data from the tabel
+  # get all data from the table based on the search text using the LIKE keyword
   response = db.session.query(Artist).filter(Artist.name.ilike(f'%{search_text}%')).all()
 
+  # A dictionary that will hold all the data returned from the DB
   my_dic = {}
-  my_arr = []
+
+  # A list that will hold each venue data and thier values
+  my_list = []
+
+  # An int of the count increases based on the total num of results returned from the DB
   i = 0
+
+  # A loop to loop through each returned data
   for a in response:
+    # A dictionary that holds each venue and thier values
     my_dic2 = {}
     i = i + 1
     my_dic['count'] = i 
     my_dic2['id'] = a.id
     my_dic2['name'] = a.name
     my_dic2['num_upcoming_shows'] = a.num_upcoming_shows
-    my_arr.append(my_dic2)
+    my_list.append(my_dic2)
   
-  my_dic['data'] = my_arr
+  my_dic['data'] = my_list
 
   return render_template('pages/search_artists.html', results=my_dic, search_term=request.form.get('search_term', ''))
 
@@ -339,10 +374,9 @@ def show_artist(artist_id):
   # shows the artist page with the given artist_id
   # TODO: replace with real artist data from the artist table, using artist_id
   data = Artist.query.filter(Artist.id == artist_id).first()
-  past_shows = Show.query.filter(Show.artist_id == artist_id).all()
+  shows = Show.query.filter(Show.artist_id == artist_id).all()
 
-  #print(past_shows)
-  mydata = {
+  artist = {
     "id": data.id,
     "name": data.name,
     "genres": data.genres.split(','),
@@ -353,26 +387,30 @@ def show_artist(artist_id):
     "facebook_link": data.facebook_link,
     "seeking_venue": data.seeking_venue,
     "seeking_description": data.seeking_description,
-    "image_link": data.image_link
+    "image_link": data.image_link,
+    "available": data.available
   }
+
+  # Current datetime in seconds
   t = time.time()
-  my_arr = []
-  my_arr2 = []
-  for s in past_shows:
+
+  my_list = []
+  my_list2 = []
+
+  for s in shows:
     my_dic = {}
     if s.start_time.timestamp() < t :
       my_dic['venue_id'] = s.venue_id
       my_dic['start_time'] = s.start_time
-      my_arr.append(my_dic)
+      my_list.append(my_dic)
 
     else:
       my_dic['venue_id'] = s.venue_id
       my_dic['start_time'] = s.start_time
-      my_arr2.append(my_dic)
+      my_list2.append(my_dic)
 
-  mydata['past_shows']= my_arr
-  mydata['upcoming_shows'] = my_arr2
-  print(mydata)
+  artist['past_shows']= my_list
+  artist['upcoming_shows'] = my_list2
 
   # data3={
   #   "id": 6,
@@ -404,7 +442,7 @@ def show_artist(artist_id):
   #   "upcoming_shows_count": 3,
   # }
   # data = list(filter(lambda d: d['id'] == artist_id, [data1, data2, data3]))[0]
-  return render_template('pages/show_artist.html', artist=mydata)
+  return render_template('pages/show_artist.html', artist=artist)
 
 #  Update
 #  ----------------------------------------------------------------
@@ -421,6 +459,17 @@ def edit_artist_submission(artist_id):
   # artist record with ID <artist_id> using the new attributes
 
   error = False
+
+  # Check if a values are available in the list to avoid server error
+  if 'seeking_venue' in request.form:
+    seeking_venue = request.form['seeking_venue']
+  else:
+    seeking_venue = ''
+
+    if 'available' in request.form:
+      available = request.form['available']
+    else:
+      available = ''
   try:
     artist = Artist.query.get(artist_id)
 
@@ -428,22 +477,25 @@ def edit_artist_submission(artist_id):
     city = request.form['city']
     state = request.form['state']
     phone = request.form['phone']
-    genres = request.form['genres']
+    genres = ',' .join(request.form.getlist('genres'))
     facebook_link = request.form['facebook_link']
     image_link = request.form['image_link']
     website_link = request.form['website_link']
-    seeking_venue = request.form['seeking_venue']
+    seeking_venue = seeking_venue
     seeking_description = request.form['seeking_description']
-    artist.name=name
-    artist.city=city
-    artist.state=state
-    artist.phone=phone
-    artist.genres=genres
-    artist.facebook_link=facebook_link
-    artist.image_link=image_link
-    artist.website_link=website_link
-    artist.seeking_venue=seeking_venue
-    artist.seeking_description=seeking_description
+    available = available
+
+    artist.name = name
+    artist.city = city
+    artist.state = state
+    artist.phone = phone
+    artist.genres = genres
+    artist.facebook_link = facebook_link
+    artist.image_link = image_link
+    artist.website_link = website_link
+    artist.seeking_venue = seeking_venue
+    artist.seeking_description = seeking_description
+    artist.available = available
 
     db.session.commit()
   
@@ -451,14 +503,12 @@ def edit_artist_submission(artist_id):
     print(e)
     error = True
     db.session.rollback()
-    #print(sys.exc_info)
 
   finally:
     db.session.close()
 
   if error:
     flash('An error occurred. Artist ' + request.form['name'] + ' could not be edited.')
-
     
   else:
   # on successful db insert, flash success
@@ -477,11 +527,14 @@ def delete_artist(artist_id):
   try:
     Show.query.filter(Show.artist_id==artist_id).delete()
     Artist.query.filter_by(id=artist_id).delete()
+
     db.session.commit()
+
   except Exception as e:
     error = True
     print(e)
     db.session.rollback()
+
   finally:
     db.session.close()
 
@@ -507,6 +560,13 @@ def edit_venue_submission(venue_id):
   # TODO: take values from the form submitted, and update existing
   # venue record with ID <venue_id> using the new attributes
   error = False
+
+    # Check if a values are available in the list to avoid server error
+  if 'seeking_talent' in request.form:
+    seeking_talent = request.form['seeking_venue']
+  else:
+    seeking_talent = ''
+
   try:
     venue = Venue.query.get(venue_id)
     name = request.form['name']
@@ -514,12 +574,13 @@ def edit_venue_submission(venue_id):
     state = request.form['state']
     address = request.form['address']
     phone = request.form['phone']
-    genres = request.form['genres']
+    genres = ',' .join(request.form.getlist('genres'))
     facebook_link = request.form['facebook_link']
     image_link = request.form['image_link']
     website_link = request.form['website_link']
-    seeking_talent = request.form['seeking_talent']
+    seeking_talent = seeking_talent
     seeking_description = request.form['seeking_description']
+
     venue.name=name
     venue.city=city
     venue.state=state
@@ -531,13 +592,13 @@ def edit_venue_submission(venue_id):
     venue.website_link=website_link
     venue.seeking_talent=seeking_talent
     venue.seeking_description=seeking_description
+
     db.session.commit()
   
   except Exception as e: 
     print(e)
     error = True
     db.session.rollback()
-    #print(sys.exc_info)
 
   finally:
     db.session.close()
@@ -565,20 +626,33 @@ def create_artist_submission():
   # TODO: insert form data as a new Venue record in the db, instead
   # TODO: modify data to be the data object returned from db insertion
   error = False
+
+  # Check if a values are available in the list to avoid server error
+  if 'seeking_venue' in request.form:
+    seeking_venue = request.form['seeking_venue']
+  else:
+    seeking_venue = ''
+
+    if 'available' in request.form:
+      available = request.form['available']
+    else:
+      available = ''
+
   try:
     name = request.form['name']
     city = request.form['city']
     state = request.form['state']
     phone = request.form['phone']
-    genres = request.form['genres']
+    genres = ',' .join(request.form.getlist('genres'))
     facebook_link = request.form['facebook_link']
     image_link = request.form['image_link']
     website_link = request.form['website_link']
-    seeking_venue = request.form['seeking_venue']
+    seeking_venue = seeking_venue
+    available = available
     seeking_description = request.form['seeking_description']
-    artist = Artist(name=name, city=city, state=state, phone=phone, genres=genres,
-    facebook_link=facebook_link, image_link=image_link, website_link=website_link, seeking_venue=seeking_venue,
-    seeking_description=seeking_description)
+
+    artist = Artist( name=name, city=city, state=state, phone=phone, genres=genres, facebook_link=facebook_link, image_link=image_link, website_link=website_link, seeking_venue=seeking_venue, available=available, seeking_description=seeking_description )
+
     db.session.add(artist)
     db.session.commit()
   
@@ -586,7 +660,6 @@ def create_artist_submission():
     print(e)
     error = True
     db.session.rollback()
-    #print(sys.exc_info)
 
   finally:
     db.session.close()
@@ -612,19 +685,20 @@ def shows():
   # TODO: replace with real venues data.
   shows = Show.query.order_by('id').all()
 
-  my_arr = []
-  for a in shows:
+  my_list = []
+
+  for s in shows:
     my_dic = {}
-    my_dic['venue_id'] = a.venue_id
-    my_dic['venue_name'] = Venue.query.filter(Venue.id == a.venue_id).first().name
-    my_dic['artist_id'] = a.artist_id
-    my_dic['artist_name'] = Artist.query.filter(Artist.id == a.artist_id).first().name
-    my_dic['artist_image_link'] = Artist.query.filter(Artist.id == a.artist_id).first().image_link
-    my_dic['start_time'] = a.start_time
+    my_dic['venue_id'] = s.venue_id
+    my_dic['venue_name'] = Venue.query.filter(Venue.id == s.venue_id).first().name
+    my_dic['artist_id'] = s.artist_id
+    my_dic['artist_name'] = Artist.query.filter(Artist.id == s.artist_id).first().name
+    my_dic['artist_image_link'] = Artist.query.filter(Artist.id == s.artist_id).first().image_link
+    my_dic['start_time'] = s.start_time
 
-    my_arr.append(my_dic)
+    my_list.append(my_dic)
 
-  data = my_arr
+  data = my_list
 
   return render_template('pages/shows.html', shows=data)
 
@@ -639,19 +713,31 @@ def create_show_submission():
   # called to create new shows in the db, upon submitting new show listing form
   # TODO: insert form data as a new Show record in the db, instead
   error = False
+
+  # Get the artist data by id to check availability
+  artist = Artist.query.filter(Artist.id == request.form['artist_id']).first()
+
+  # Check if artist is available
+  if artist.available == 'y':
+    artist_is_available = True
+  else:
+    artist_is_available = False  
+
   try:
     artist_id = request.form['artist_id']
     venue_id = request.form['venue_id']
     start_time = request.form['start_time']
-    show = Show(artist_id=artist_id, venue_id=venue_id, start_time=start_time)
-    db.session.add(show)
-    db.session.commit()
-  
+    show = Show(artist_id = artist_id, venue_id = venue_id, start_time = start_time)
+    
+    if artist_is_available:
+      db.session.add(show)
+      db.session.commit()
+
+
   except Exception as e: 
     print(e)
     error = True
     db.session.rollback()
-    #print(sys.exc_info)
 
   finally:
     db.session.close()
@@ -659,8 +745,11 @@ def create_show_submission():
   if error:
     flash('An error occurred. show could not be listed.')
 
-    
-  else:
+  elif artist_is_available == False:
+    flash('Artist ' + artist.name + ' is not Currently Available. show could not be listed.')
+
+  else: 
+
   # on successful db insert, flash success
     flash('Show was successfully listed!')
   # TODO: on unsuccessful db insert, flash an error instead.

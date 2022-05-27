@@ -26,6 +26,19 @@
 		<p>
 			<i class="fab fa-facebook-f"></i> {% if artist.facebook_link %}<a href="{{ artist.facebook_link }}" target="_blank">{{ artist.facebook_link }}</a>{% else %}No Facebook Link{% endif %}
         </p>
+
+		{% if artist.available %}
+		<div class="seeking">
+			<p class="lead">This Artist is Currently Available</p>
+			
+		</div>
+		{% else %}	
+		<p class="not-seeking">
+			<i class="fas fa-moon"></i> This Artist is Currently Not Available
+		</p>
+		{% endif %}
+
+
 		{% if artist.seeking_venue %}
 		<div class="seeking">
 			<p class="lead">Currently seeking performance venues</p>

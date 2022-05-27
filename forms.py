@@ -193,7 +193,7 @@ class ArtistForm(Form):
     )
     phone = StringField(
         # TODO implement validation logic for state
-        'phone'
+        'phone', validators=[DataRequired()]
     )
     image_link = StringField(
         'image_link'
@@ -232,6 +232,9 @@ class ArtistForm(Form):
      )
 
     seeking_venue = BooleanField( 'seeking_venue' )
+    
+    available = BooleanField( 'available' )
+
 
     seeking_description = StringField(
             'seeking_description'
