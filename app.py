@@ -264,7 +264,7 @@ def create_venue_submission():
 
   # Check if a values are available in the list to avoid server error
   if 'seeking_talent' in request.form:
-    seeking_talent = request.form['seeking_venue']
+    seeking_talent = request.form['seeking_talent']
   else:
     seeking_talent = ''
 
@@ -755,7 +755,7 @@ def create_show_submission():
   # TODO: on unsuccessful db insert, flash an error instead.
   # e.g., flash('An error occurred. Show could not be listed.')
   # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
-  return render_template('pages/home.html')
+  return redirect(url_for('index'))
 
 @app.errorhandler(404)
 def not_found_error(error):
