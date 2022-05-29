@@ -48,7 +48,7 @@ def search_artists():
     my_dic['count'] = i 
     my_dic2['id'] = a.id
     my_dic2['name'] = a.name
-    my_dic2['num_upcoming_shows'] = 0
+    my_dic2['num_upcoming_shows'] = Show.query.filter_by(artist_id=a.id).count()
     my_list.append(my_dic2)
   
   my_dic['data'] = my_list

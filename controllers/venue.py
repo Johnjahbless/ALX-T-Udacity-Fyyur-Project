@@ -36,13 +36,12 @@ def venues():
     my_arr2.append({
       'id': v.id,
       "name": v.name,
-      'num_upcoming_shows': 0
+      'num_upcoming_shows': Show.query.filter_by(venue_id=v.id).count()
     })
     my_dic['venues'] = my_arr2
     
     venues.append(my_dic)
   
- 
   return render_template('pages/venues.html', areas=venues);
 
 def search_venues():
@@ -74,7 +73,7 @@ def search_venues():
     my_dic['count'] = i 
     my_dic2['id'] = a.id
     my_dic2['name'] = a.name
-    my_dic2['num_upcoming_shows'] = 0
+    my_dic2['num_upcoming_shows'] = Show.query.filter_by(venue_id=a.id).count()
     my_list.append(my_dic2)
     
   my_dic['data'] = my_list
