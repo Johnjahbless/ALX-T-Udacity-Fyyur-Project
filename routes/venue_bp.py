@@ -1,11 +1,12 @@
 from flask import Blueprint
 
+# Import functions from controllers
 from controllers.venue import venues, search_venues, show_venue, create_venue_form, create_venue_submission, delete_venue, edit_venue, edit_venue_submission
 
 
 venue_bp = Blueprint('venue_bp', __name__)
 
-
+# Define appropriate routes
 venue_bp.route('/', methods=['GET']) (venues)
 venue_bp.route('/search', methods=['POST']) (search_venues)
 venue_bp.route('/<int:venue_id>', methods=['GET']) (show_venue)

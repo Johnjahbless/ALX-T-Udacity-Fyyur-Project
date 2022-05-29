@@ -14,6 +14,7 @@ from flask_migrate import Migrate
 
 from models.models import db, Venue, Artist
 
+# Imports routes blueprints
 from routes.venue_bp import venue_bp
 from routes.artist_bp import artist_bp
 from routes.show_bp import show_bp
@@ -28,7 +29,7 @@ app.config.from_object('config')
 db.init_app(app)
 migrate = Migrate(app, db)
 
-#routes blueprint
+# Register routes blueprint
 app.register_blueprint(venue_bp, url_prefix='/venues')
 app.register_blueprint(artist_bp, url_prefix='/artists')
 app.register_blueprint(show_bp, url_prefix='/shows')
@@ -38,9 +39,7 @@ app.register_blueprint(show_bp, url_prefix='/shows')
 
 # TODO: connect to a local postgresql database
 
-#----------------------------------------------------------------------------#
-# Models.
-#----------------------------------------------------------------------------#
+
 
 @app.route('/')
 def index():

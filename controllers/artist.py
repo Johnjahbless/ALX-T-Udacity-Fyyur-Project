@@ -1,12 +1,11 @@
 from sqlalchemy import or_
-from os import abort
 from time import time
 from flask import render_template, request, flash, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from forms import * 
 import time
 
-
+# Import models
 from models.models import Venue, Artist, Show
 
 db = SQLAlchemy()

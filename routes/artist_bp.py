@@ -1,11 +1,12 @@
 from flask import Blueprint
 
+# Import functions from controllers
 from controllers.artist import artists, search_artists, show_artist, create_artist_form, create_artist_submission, delete_artist, edit_artist, edit_artist_submission
 
 
 artist_bp = Blueprint('artist_bp', __name__)
 
-
+# Define appropriate routes
 artist_bp.route('/', methods=['GET']) (artists)
 artist_bp.route('/search', methods=['POST']) (search_artists)
 artist_bp.route('/<int:artist_id>', methods=['GET']) (show_artist)

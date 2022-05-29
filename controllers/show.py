@@ -1,19 +1,9 @@
 from sqlalchemy import or_
-from os import abort
-from site import venv
-from time import time
-from flask import Flask, render_template, request, Response, flash, redirect, url_for
-from flask_moment import Moment
+from flask import render_template, request, flash, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
-import logging
-from logging import Formatter, FileHandler
-from flask_wtf import Form
 from forms import * 
-from flask_migrate import Migrate
-import datetime
-import time
 
-
+# Import models
 from models.models import Venue, Artist, Show
 
 db = SQLAlchemy()
